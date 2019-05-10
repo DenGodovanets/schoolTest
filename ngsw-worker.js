@@ -1050,56 +1050,45 @@
          */
         handleFetch(req, ctx) {
             return __awaiter$1(this, void 0, void 0, function* () {
-                try {
-
-                    console.log('handleFetch');
-                    if (!this.patterns.some(pattern => pattern.test(req.url))) {
+                // Do nothing
+                if (!this.patterns.some(pattern => pattern.test(req.url))) {
+                    return null;
+                }
+                // Lazily initialize the LRU cache.
+                const lru = yield this.lru();
+                // The URL matches this cache. First, check whether this is a mutating request or not.
+                switch (req.method) {
+                    case 'OPTIONS':
+                        // Don't try to cache this - it's non-mutating, but is part of a mutating request.
+                        // Most likely SWs don't even see this, but this guard is here just in case.
                         return null;
-                    }
-                    // Lazily initialize the LRU cache.
-                    const lru = yield this.lru();
-                    // The URL matches this cache. First, check whether this is a mutating request or not.
-                    switch (req.method) {
-                        case 'OPTIONS':
-                            // Don't try to cache this - it's non-mutating, but is part of a mutating request.
-                            // Most likely SWs don't even see this, but this guard is here just in case.
-                            return null;
-                        case 'GET':
-                        case 'HEAD':
-                            // Handle the request with whatever strategy was selected.
-                            switch (this.config.strategy) {
-                                case 'freshness':
-                                    return this.handleFetchWithFreshness(req, ctx, lru);
-                                case 'performance':
-                                    return this.handleFetchWithPerformance(req, ctx, lru);
-                                default:
-                                    throw new Error(`Unknown strategy: ${this.config.strategy}`);
-                            }
-                        default:
-                            // This was a mutating request. Assume the cache for this URL is no longer valid.
-                            const wasCached = lru.remove(req.url);
-                            // If there was a cached entry, remove it.
-                            if (wasCached) {
-                                yield this.clearCacheForUrl(req.url);
-                            }
-                            // Sync the LRU chain to non-volatile storage.
-                            yield this.syncLru();
-                            // Finally, fall back on the network.
-                            return this.safeFetch(req);
-                    }
-                
-                  
-                  } catch (err) {
-                  
-                   console.log('erroraasdsfas',err)
-                  
-                  }
-                });
-                
+                    case 'GET':
+                    case 'HEAD':
+                        // Handle the request with whatever strategy was selected.
+                        switch (this.config.strategy) {
+                            case 'freshness':
+                                return this.handleFetchWithFreshness(req, ctx, lru);
+                            case 'performance':
+                                return this.handleFetchWithPerformance(req, ctx, lru);
+                            default:
+                                throw new Error(`Unknown strategy: ${this.config.strategy}`);
+                        }
+                    default:
+                        // This was a mutating request. Assume the cache for this URL is no longer valid.
+                        const wasCached = lru.remove(req.url);
+                        // If there was a cached entry, remove it.
+                        if (wasCached) {
+                            yield this.clearCacheForUrl(req.url);
+                        }
+                        // Sync the LRU chain to non-volatile storage.
+                        yield this.syncLru();
+                        // Finally, fall back on the network.
+                        return this.safeFetch(req);
+                }
+            });
         }
         handleFetchWithPerformance(req, ctx, lru) {
             return __awaiter$1(this, void 0, void 0, function* () {
-                console.log('handleFetchWithPerformance');
                 let res = null;
                 // Check the cache first. If the resource exists there (and is not expired), the cached
                 // version can be used.
@@ -1604,7 +1593,6 @@
         }
         handleFetch(req) {
             return __awaiter$3(this, void 0, void 0, function* () {
-                console.log('handleFetchreq');
                 const [state, versions, idle] = yield Promise.all([
                     this.driver.debugState(),
                     this.driver.debugVersions(),
@@ -2115,7 +2103,6 @@ ${msgIdle}`, { headers: this.adapter.newHeaders({ 'Content-Type': 'text/plain' }
                 }
                 catch (e) {
                     // Initialization failed. Enter a safe state.
-                    console.log('catcherror')
                     this.state = DriverReadyState.SAFE_MODE;
                     this.stateMessage = `Initialization failed due to error: ${errorToString(e)}`;
                     // Even though the driver entered safe mode, background tasks still need to happen.
@@ -2149,7 +2136,6 @@ ${msgIdle}`, { headers: this.adapter.newHeaders({ 'Content-Type': 'text/plain' }
                 catch (err) {
                     if (err.isCritical) {
                         // Something went wrong with the activation of this version.
-                        console.log('rror2')
                         yield this.versionFailed(appVersion, err, this.latestHash === appVersion.manifestHash);
                         event.waitUntil(this.idle.trigger());
                         return this.safeFetch(event.request);
